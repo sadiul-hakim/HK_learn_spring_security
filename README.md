@@ -41,6 +41,57 @@ UserDetailsService userDetailsService() {
 
 `Now just add this UserDetailsService to HttpSecurity.`
 
+## Authorization
+
+`For authorization we can use .authorizeHttpRequests() of HttpSecurity class. Also we have options for Method level 
+security. While using HttpSecurity class for Authorization (1) First we should pass the permitAll endpoints (2) Then 
+endpoints with roles or authorities and then (3) endpoints with only authenticated access. Like below:`
+
+```java
+@Bean
+    public SecurityFilterChain config(HttpSecurity http) throws Exception {
+
+        String[] publicApi = {
+                "/",
+                "/css/**",
+                "/fonts/**",
+                "/js/**",
+                "/images/**",
+                "/picture/**",
+                "/admin_login"
+        };
+
+        String[] authenticatedUserAccess = {
+                "/categories/get-all",
+                "/brands/get-all",
+                "/products/get-all"
+        };
+
+        String[] adminAccess = {
+                "/dashboard/**",
+                "/users/**",
+                "/roles/**",
+                "/brands/**",
+                "/categories/**",
+                "/products/**"
+        };
+        return http
+                .authorizeHttpRequests(auth -> auth.requestMatchers(publicApi).permitAll())
+                .authorizeHttpRequests(auth -> auth.requestMatchers(authenticatedUserAccess).authenticated())
+                .authorizeHttpRequests(auth -> auth.requestMatchers(adminAccess).hasAnyRole("ADMIN", "ASSISTANT"))
+                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .userDetailsService(userDetailsService)
+                .oauth2Login(login -> login.loginPage("/oauth2/authorization/google").successHandler(authenticationSuccessHandler))
+                .formLogin(form -> form
+                        .loginPage("/admin_login")
+                        .defaultSuccessUrl("/dashboard/page", true)
+                        .loginProcessingUrl("/login")
+                        .failureUrl("/login?error=true").permitAll())
+                .logout(logout -> logout.logoutUrl("/logout").permitAll().logoutSuccessUrl("/"))
+                .build();
+    }
+```
+
 ## Social Login (OAuth2) - Google
 
 1. Create google app from https://console.cloud.google.com/ use redirect url like this
