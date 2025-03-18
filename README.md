@@ -48,48 +48,49 @@ security. While using HttpSecurity class for Authorization (1) First we should p
 endpoints with roles or authorities and then (3) endpoints with only authenticated access. Like below:`
 
 ```java
+
 @Bean
-    public SecurityFilterChain config(HttpSecurity http) throws Exception {
+public SecurityFilterChain config(HttpSecurity http) throws Exception {
 
-        String[] publicApi = {
-                "/",
-                "/css/**",
-                "/fonts/**",
-                "/js/**",
-                "/images/**",
-                "/picture/**",
-                "/admin_login"
-        };
+    String[] publicApi = {
+            "/",
+            "/css/**",
+            "/fonts/**",
+            "/js/**",
+            "/images/**",
+            "/picture/**",
+            "/admin_login"
+    };
 
-        String[] authenticatedUserAccess = {
-                "/categories/get-all",
-                "/brands/get-all",
-                "/products/get-all"
-        };
+    String[] authenticatedUserAccess = {
+            "/categories/get-all",
+            "/brands/get-all",
+            "/products/get-all"
+    };
 
-        String[] adminAccess = {
-                "/dashboard/**",
-                "/users/**",
-                "/roles/**",
-                "/brands/**",
-                "/categories/**",
-                "/products/**"
-        };
-        return http
-                .authorizeHttpRequests(auth -> auth.requestMatchers(publicApi).permitAll())
-                .authorizeHttpRequests(auth -> auth.requestMatchers(authenticatedUserAccess).authenticated())
-                .authorizeHttpRequests(auth -> auth.requestMatchers(adminAccess).hasAnyRole("ADMIN", "ASSISTANT"))
-                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
-                .userDetailsService(userDetailsService)
-                .oauth2Login(login -> login.loginPage("/oauth2/authorization/google").successHandler(authenticationSuccessHandler))
-                .formLogin(form -> form
-                        .loginPage("/admin_login")
-                        .defaultSuccessUrl("/dashboard/page", true)
-                        .loginProcessingUrl("/login")
-                        .failureUrl("/login?error=true").permitAll())
-                .logout(logout -> logout.logoutUrl("/logout").permitAll().logoutSuccessUrl("/"))
-                .build();
-    }
+    String[] adminAccess = {
+            "/dashboard/**",
+            "/users/**",
+            "/roles/**",
+            "/brands/**",
+            "/categories/**",
+            "/products/**"
+    };
+    return http
+            .authorizeHttpRequests(auth -> auth.requestMatchers(publicApi).permitAll())
+            .authorizeHttpRequests(auth -> auth.requestMatchers(authenticatedUserAccess).authenticated())
+            .authorizeHttpRequests(auth -> auth.requestMatchers(adminAccess).hasAnyRole("ADMIN", "ASSISTANT"))
+            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+            .userDetailsService(userDetailsService)
+            .oauth2Login(login -> login.loginPage("/oauth2/authorization/google").successHandler(authenticationSuccessHandler))
+            .formLogin(form -> form
+                    .loginPage("/admin_login")
+                    .defaultSuccessUrl("/dashboard/page", true)
+                    .loginProcessingUrl("/login")
+                    .failureUrl("/login?error=true").permitAll())
+            .logout(logout -> logout.logoutUrl("/logout").permitAll().logoutSuccessUrl("/"))
+            .build();
+}
 ```
 
 ## Social Login (OAuth2) - Google
@@ -128,6 +129,8 @@ We have en endpoint /who_is_he?shortName=?. To secure this app with basic auth f
     3. Actual users from database.
 3. Then put below configuration in `@Configuration` file
 
+with hard coded user in properties file
+
 ```java
 
 @Bean
@@ -140,5 +143,100 @@ public SecurityFilterChain config(HttpSecurity http) throws Exception {
 }
 ```
 
+or with real users
+
+```java
+
+@Bean
+public SecurityFilterChain config(HttpSecurity http) throws Exception {
+    return http
+            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+            .userDetailsService(userDetailsService)
+            .httpBasic(Customizer.withDefaults())
+            .logout(logout -> logout.logoutUrl("/logout").permitAll().logoutSuccessUrl("/"))
+            .build();
+}
+
+@Bean
+public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+}
+```
+
 `You can provide lamda (http) -> {} and provide some custome configuration`.
 
+## Form Login
+
+`Exactly like Basic Auth with slidly different config like below: `
+
+```java
+
+@Bean
+public SecurityFilterChain config(HttpSecurity http) throws Exception {
+    return http
+            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+            .userDetailsService(userDetailsService)
+            .formLogin(form -> form
+                    .loginPage("/admin_login")
+                    .defaultSuccessUrl("/dashboard/page", true)
+                    .loginProcessingUrl("/login")
+                    .failureUrl("/login?error=true").permitAll())
+            .logout(logout -> logout.logoutUrl("/logout").permitAll().logoutSuccessUrl("/"))
+            .build();
+}
+
+@Bean
+public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+}
+```
+
+`We can create custom login page the login page url should be configured in .loginPage(). We can also change 
+username,password, remember_me input fields name.`
+
+## CSRF Security
+
+`CSRF is by default inabled by spring security. In case of Form Login we can access csrf using _csrf parameter. We can 
+customize csrf security.`
+
+`> Add Later`
+
+## CORS
+
+> Create Bean
+
+```java
+
+@Bean
+public CorsConfigurationSource corsConfigurationSource() {
+
+    CorsConfiguration configuration = new CorsConfiguration();
+    configuration.setAllowedOriginPatterns(List.of("*"));
+    configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+    configuration.setMaxAge(3600L);
+    configuration.setAllowedHeaders(List.of(
+            "Authorization", "Content-Type", "X-Requested-With", "Origin", "Accept",
+            "Access-Control-Request-Method", "Access-Control-Request-Headers"
+    ));
+    configuration.setAllowCredentials(true);
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", configuration);
+
+    return source;
+}
+```
+
+> Add this to HttpSecurity
+
+```java
+
+@Bean
+public SecurityFilterChain config(HttpSecurity http) throws Exception {
+    return http
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+            .httpBasic(Customizer.withDefaults())
+            .logout(logout -> logout.logoutUrl("/logout").permitAll().logoutSuccessUrl("/"))
+            .build();
+}
+```
