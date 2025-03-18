@@ -93,107 +93,6 @@ public SecurityFilterChain config(HttpSecurity http) throws Exception {
 }
 ```
 
-## Social Login (OAuth2) - Google
-
-1. Create google app from https://console.cloud.google.com/ use redirect url like this
-   `http://localhost:9090/login/oauth2/code/google`
-2. Bring Client ID and Secret, put them in environment variables or somewhere safe and do not push them in GitHub
-3. Add `spring-boot-starter-oauth2-client` dependency in your project
-4. Add `spring.security.oauth2.client.registration.google.client-id=${CLIENT_ID}` and
-   `spring.security.oauth2.client.registration.google.client-secret=${SECRET}` in properties file.
-5. Configure the security in `@Configuration` file like below code
-6. access `/oauth2/authorization/google` to login
-
-```java
-
-@Bean
-public SecurityFilterChain config(HttpSecurity http) throws Exception {
-    return http
-            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
-            .oauth2Login(login -> login.loginPage("/oauth2/authorization/google"))
-            .logout(logout -> logout.logoutUrl("/logout").permitAll().logoutSuccessUrl("/"))
-            .build();
-}
-```
-
-`Oauth2 authenticated users Principal type is OAuth2User`
-
-## Basic Auth
-
-We have en endpoint /who_is_he?shortName=?. To secure this app with basic auth follow the next instruction
-
-1. Make sure you have `spring-boot-starter-security` dependency
-2. Now we have to add users to our system. We can add hard coded users in our system.
-    1. Put user information in properties file add `spring.security.user.name=` and `spring.security.user.password=`
-    2. Hardcoded users in `@Configuration` file
-    3. Actual users from database.
-3. Then put below configuration in `@Configuration` file
-
-with hard coded user in properties file
-
-```java
-
-@Bean
-public SecurityFilterChain config(HttpSecurity http) throws Exception {
-    return http
-            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
-            .httpBasic(Customizer.withDefaults())
-            .logout(logout -> logout.logoutUrl("/logout").permitAll().logoutSuccessUrl("/"))
-            .build();
-}
-```
-
-or with real users
-
-```java
-
-@Bean
-public SecurityFilterChain config(HttpSecurity http) throws Exception {
-    return http
-            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
-            .userDetailsService(userDetailsService)
-            .httpBasic(Customizer.withDefaults())
-            .logout(logout -> logout.logoutUrl("/logout").permitAll().logoutSuccessUrl("/"))
-            .build();
-}
-
-@Bean
-public PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder();
-}
-```
-
-`You can provide lamda (http) -> {} and provide some custome configuration`.
-
-## Form Login
-
-`Exactly like Basic Auth with slidly different config like below: `
-
-```java
-
-@Bean
-public SecurityFilterChain config(HttpSecurity http) throws Exception {
-    return http
-            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
-            .userDetailsService(userDetailsService)
-            .formLogin(form -> form
-                    .loginPage("/admin_login")
-                    .defaultSuccessUrl("/dashboard/page", true)
-                    .loginProcessingUrl("/login")
-                    .failureUrl("/login?error=true").permitAll())
-            .logout(logout -> logout.logoutUrl("/logout").permitAll().logoutSuccessUrl("/"))
-            .build();
-}
-
-@Bean
-public PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder();
-}
-```
-
-`We can create custom login page the login page url should be configured in .loginPage(). We can also change 
-username,password, remember_me input fields name.`
-
 ## CORS
 
 > Create Bean
@@ -416,3 +315,104 @@ public class CustomCsrfTokenRepository implements CsrfTokenRepository {
 - **Customize CSRF handling using `CsrfTokenRepository`** for advanced use cases.
 
 Let me know if you need help integrating this into your **SpringBase** project! 🚀
+
+## Social Login (OAuth2) - Google
+
+1. Create google app from https://console.cloud.google.com/ use redirect url like this
+   `http://localhost:9090/login/oauth2/code/google`
+2. Bring Client ID and Secret, put them in environment variables or somewhere safe and do not push them in GitHub
+3. Add `spring-boot-starter-oauth2-client` dependency in your project
+4. Add `spring.security.oauth2.client.registration.google.client-id=${CLIENT_ID}` and
+   `spring.security.oauth2.client.registration.google.client-secret=${SECRET}` in properties file.
+5. Configure the security in `@Configuration` file like below code
+6. access `/oauth2/authorization/google` to login
+
+```java
+
+@Bean
+public SecurityFilterChain config(HttpSecurity http) throws Exception {
+    return http
+            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+            .oauth2Login(login -> login.loginPage("/oauth2/authorization/google"))
+            .logout(logout -> logout.logoutUrl("/logout").permitAll().logoutSuccessUrl("/"))
+            .build();
+}
+```
+
+`Oauth2 authenticated users Principal type is OAuth2User`
+
+## Basic Auth
+
+We have en endpoint /who_is_he?shortName=?. To secure this app with basic auth follow the next instruction
+
+1. Make sure you have `spring-boot-starter-security` dependency
+2. Now we have to add users to our system. We can add hard coded users in our system.
+    1. Put user information in properties file add `spring.security.user.name=` and `spring.security.user.password=`
+    2. Hardcoded users in `@Configuration` file
+    3. Actual users from database.
+3. Then put below configuration in `@Configuration` file
+
+with hard coded user in properties file
+
+```java
+
+@Bean
+public SecurityFilterChain config(HttpSecurity http) throws Exception {
+    return http
+            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+            .httpBasic(Customizer.withDefaults())
+            .logout(logout -> logout.logoutUrl("/logout").permitAll().logoutSuccessUrl("/"))
+            .build();
+}
+```
+
+or with real users
+
+```java
+
+@Bean
+public SecurityFilterChain config(HttpSecurity http) throws Exception {
+    return http
+            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+            .userDetailsService(userDetailsService)
+            .httpBasic(Customizer.withDefaults())
+            .logout(logout -> logout.logoutUrl("/logout").permitAll().logoutSuccessUrl("/"))
+            .build();
+}
+
+@Bean
+public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+}
+```
+
+`You can provide lamda (http) -> {} and provide some custome configuration`.
+
+## Form Login
+
+`Exactly like Basic Auth with slidly different config like below: `
+
+```java
+
+@Bean
+public SecurityFilterChain config(HttpSecurity http) throws Exception {
+    return http
+            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+            .userDetailsService(userDetailsService)
+            .formLogin(form -> form
+                    .loginPage("/admin_login")
+                    .defaultSuccessUrl("/dashboard/page", true)
+                    .loginProcessingUrl("/login")
+                    .failureUrl("/login?error=true").permitAll())
+            .logout(logout -> logout.logoutUrl("/logout").permitAll().logoutSuccessUrl("/"))
+            .build();
+}
+
+@Bean
+public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+}
+```
+
+`We can create custom login page the login page url should be configured in .loginPage(). We can also change 
+username,password, remember_me input fields name.`
