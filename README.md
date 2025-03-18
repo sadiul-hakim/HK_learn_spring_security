@@ -194,13 +194,6 @@ public PasswordEncoder passwordEncoder() {
 `We can create custom login page the login page url should be configured in .loginPage(). We can also change 
 username,password, remember_me input fields name.`
 
-## CSRF Security
-
-`CSRF is by default inabled by spring security. In case of Form Login we can access csrf using _csrf parameter. We can 
-customize csrf security.`
-
-`> Add Later`
-
 ## CORS
 
 > Create Bean
@@ -240,3 +233,186 @@ public SecurityFilterChain config(HttpSecurity http) throws Exception {
             .build();
 }
 ```
+
+## CSRF Security
+
+`CSRF is by default inabled by spring security. In case of Form Login we can access csrf using _csrf parameter. We can 
+customize csrf security.`
+
+### 1️⃣ Default CSRF Configuration (Enabled)
+
+Spring Security enables **CSRF protection by default**. If you don’t configure anything, it is already protecting
+against CSRF attacks.
+
+#### How CSRF Protection Works
+
+1. **Spring Security generates a CSRF token**.
+2. **The token is included in HTML forms as a hidden field**.
+3. **For non-GET requests (POST, PUT, DELETE, PATCH), Spring Security validates the token**.
+4. **If the token is missing or incorrect, the request is rejected**.
+
+---
+
+### 2️⃣ Customizing CSRF Configuration
+
+By default, Spring Security applies CSRF protection to all endpoints. You can customize it using `SecurityFilterChain`.
+
+#### 2.1 CSRF Configuration with Custom Request Matcher
+
+```java
+
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    http
+            .csrf(csrf -> csrf
+                    .ignoringRequestMatchers("/api/public/**") // Disable CSRF for public API
+            )
+            .authorizeHttpRequests(auth -> auth
+                    .requestMatchers("/admin/**").hasRole("ADMIN")
+                    .anyRequest().authenticated()
+            )
+            .formLogin(Customizer.withDefaults());
+    return http.build();
+}
+```
+
+✅ CSRF is enabled, but requests to `/api/public/**` will not require a CSRF token.
+
+---
+
+#### 2.2 CSRF Configuration for REST APIs (Stateless JWT Authentication)
+
+For **stateless REST APIs**, you usually **disable CSRF** because:
+
+- APIs don’t use **cookies-based authentication**.
+- APIs rely on **JWT or OAuth tokens**.
+
+```java
+
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    http
+            .csrf(csrf -> csrf.disable()) // Disable CSRF for stateless APIs
+            .authorizeHttpRequests(auth -> auth
+                    .requestMatchers("/api/**").permitAll()
+                    .anyRequest().authenticated()
+            )
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+    return http.build();
+}
+```
+
+✅ CSRF is disabled for REST APIs using JWT authentication.
+
+---
+
+#### 2.3 Enabling CSRF Token in Headers (AJAX & SPAs)
+
+For **AJAX requests or Single Page Applications (SPAs)**:
+
+##### Frontend - Sending CSRF Token in AJAX Request
+
+```javascript
+fetch('/api/protected', {
+    method: 'POST',
+    headers: {
+        'X-XSRF-TOKEN': getCsrfToken(), // Retrieve CSRF token from cookies
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({name: "example"})
+});
+```
+
+##### Spring Security - Configuring CSRF Token in Headers
+
+```java
+
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    http
+            .csrf(csrf -> csrf
+                    .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()) // Store CSRF token in cookies
+            )
+            .authorizeHttpRequests(auth -> auth
+                    .requestMatchers("/api/**").authenticated()
+                    .anyRequest().permitAll()
+            )
+            .formLogin(Customizer.withDefaults());
+    return http.build();
+}
+```
+
+✅ The CSRF token will be stored in a cookie named **`XSRF-TOKEN`**, and the frontend must send it as **`X-XSRF-TOKEN`**.
+
+---
+
+### 3️⃣ Advanced CSRF Configurations
+
+#### 3.1 CSRF Token Repository (Custom Implementation)
+
+```java
+
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    http
+            .csrf(csrf -> csrf
+                    .csrfTokenRepository(new CustomCsrfTokenRepository()) // Use custom CSRF repository
+            )
+            .authorizeHttpRequests(auth -> auth
+                    .requestMatchers("/admin/**").authenticated()
+                    .anyRequest().permitAll()
+            )
+            .formLogin(Customizer.withDefaults());
+    return http.build();
+}
+```
+
+**Custom CsrfTokenRepository Example:**
+
+```java
+public class CustomCsrfTokenRepository implements CsrfTokenRepository {
+
+    @Override
+    public CsrfToken generateToken(HttpServletRequest request) {
+        String token = UUID.randomUUID().toString();
+        return new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", token);
+    }
+
+    @Override
+    public void saveToken(CsrfToken token, HttpServletRequest request, HttpServletResponse response) {
+        if (token != null) {
+            response.setHeader("X-CSRF-TOKEN", token.getToken());
+        }
+    }
+
+    @Override
+    public CsrfToken loadToken(HttpServletRequest request) {
+        String token = request.getHeader("X-CSRF-TOKEN");
+        return token != null ? new DefaultCsrfToken("X-CSRF-TOKEN", "_csrf", token) : null;
+    }
+}
+```
+
+✅ Custom token repository that stores CSRF tokens in HTTP headers.
+
+---
+
+### 4️⃣ When to Enable or Disable CSRF?
+
+| **Scenario**                    | **Enable CSRF?** | **Reason**                           |
+|---------------------------------|------------------|--------------------------------------|
+| Traditional Web Apps (Forms)    | ✅ Yes            | Uses session-based authentication    |
+| REST APIs (JWT/OAuth)           | ❌ No             | Stateless authentication, no session |
+| AJAX Requests (SPAs)            | ✅ Yes            | Uses cookies for authentication      |
+| Public APIs (No Authentication) | ❌ No             | No sensitive state changes           |
+
+---
+
+### 5️⃣ Conclusion
+
+- **CSRF is enabled by default** in Spring Security.
+- **Disable CSRF for stateless REST APIs** (e.g., JWT-based authentication).
+- **Use `CookieCsrfTokenRepository` for AJAX-based apps**.
+- **Customize CSRF handling using `CsrfTokenRepository`** for advanced use cases.
+
+Let me know if you need help integrating this into your **SpringBase** project! 🚀
