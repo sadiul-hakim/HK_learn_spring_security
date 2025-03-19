@@ -416,3 +416,131 @@ public PasswordEncoder passwordEncoder() {
 
 `We can create custom login page the login page url should be configured in .loginPage(). We can also change 
 username,password, remember_me input fields name.`
+
+# OAuth2 in Spring Boot: Explained Simply
+
+OAuth2 is a security framework used for authentication and authorization in modern applications. Spring Boot provides
+different components to implement OAuth2:
+
+- **OAuth2 Client**
+- **OAuth2 Resource Server**
+- **OAuth2 Authorization Server**
+
+This document explains each in simple terms.
+
+---
+
+## 1. **Spring OAuth2 Components**
+
+### **1.1 OAuth2 Client**
+
+- Used when your application needs to **log in users** via **Google, Facebook, GitHub, Keycloak, etc.**
+- It **redirects** users to an OAuth2 provider for login.
+- Once authenticated, the provider sends an **access token** back to your app.
+- Example: Logging in with Google in a web or mobile app.
+
+📌 **Use case:** Frontend or backend applications that authenticate users via an external identity provider.
+
+#### **Example of OAuth2 Client in Spring Boot**
+
+```java
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http.oauth2Login(); // Enables OAuth2 login (Google, GitHub, etc.)
+        return http.build();
+    }
+}
+```
+
+### **1.2 OAuth2 Resource Server**
+
+- Used when your **backend API needs to verify JWT tokens** sent by a client.
+- It checks whether a request has a valid token before processing it.
+- Example: A mobile app sends a token, and the backend verifies it before giving access to data.
+
+📌 **Use case:** Backend API that protects routes using JWT tokens issued by an Authorization Server.
+
+#### **Example of OAuth2 Resource Server in Spring Boot**
+
+```java
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .oauth2ResourceServer(OAuth2ResourceServerConfigurer::jwt); // Validates JWT tokens
+        return http.build();
+    }
+}
+```
+
+### **1.3 OAuth2 Authorization Server**
+
+- Issues **JWT tokens** when users log in.
+- Manages **user authentication** and **client (app) authentication**.
+- Example: Keycloak, Auth0, Okta, or a self-hosted Spring Authorization Server.
+
+📌 **Use case:** When you need to **issue tokens** for users or apps yourself instead of using an external provider.
+
+#### **Example of OAuth2 Authorization Server in Spring Boot**
+
+```java
+
+@Configuration
+public class AuthorizationServerConfig {
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        OAuth2AuthorizationServerConfigurer authorizationServerConfigurer = new OAuth2AuthorizationServerConfigurer();
+        http.apply(authorizationServerConfigurer);
+        return http.build();
+    }
+}
+```
+
+---
+
+## 2. **Spring Authorization Server vs Keycloak**
+
+| Feature                   | Spring Authorization Server                                 | Keycloak                                         |
+|---------------------------|-------------------------------------------------------------|--------------------------------------------------|
+| **Purpose**               | Self-hosted OAuth2 Authorization Server for issuing tokens  | Full Identity & Access Management System         |
+| **Setup**                 | Requires manual configuration & coding                      | Ready-to-use with UI & Admin Panel               |
+| **User Management**       | No built-in user management (you must integrate a database) | Built-in user management, roles, and permissions |
+| **Multi-Tenancy**         | Not supported out of the box                                | Supported (multi-realm system)                   |
+| **OIDC Support**          | Yes (requires setup)                                        | Yes (pre-configured)                             |
+| **Custom Token Handling** | Fully customizable                                          | Customizable but follows Keycloak standards      |
+| **Use Case**              | When you need to build a custom token server for APIs       | When you need a full-fledged identity system     |
+
+---
+
+## 3. **Which One Should You Use?**
+
+### ✅ Use **Spring Authorization Server** if:
+
+- You need a **lightweight, custom OAuth2 server**.
+- You want **full control over token generation and user authentication**.
+- Your project requires a **microservices-friendly** solution.
+
+### ✅ Use **Keycloak** if:
+
+- You need a **ready-made identity provider** with **user management**.
+- You don’t want to manually **handle authentication, roles, and permissions**.
+- You want features like **multi-tenancy, social login, and federated identity**.
+
+---
+
+## **Conclusion**
+
+- **OAuth2 Client** → For logging in users via Google, GitHub, etc.
+- **OAuth2 Resource Server** → For protecting APIs using JWT tokens.
+- **OAuth2 Authorization Server** → For issuing JWT tokens.
+- **Spring Authorization Server vs Keycloak** → Use Spring if you need full customization; use Keycloak if you need an
+  out-of-the-box identity system.
+
+Would you like a hands-on guide on implementing one of these? 🚀

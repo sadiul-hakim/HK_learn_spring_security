@@ -21,6 +21,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
                 .userDetailsService(userDetailsService())
                 .oauth2Login(login -> login.loginPage("/oauth2/authorization/google"))
+                .formLogin(Customizer.withDefaults())
                 .httpBasic(Customizer.withDefaults())
                 .logout(logout -> logout.logoutUrl("/logout").permitAll().logoutSuccessUrl("/"))
                 .build();
