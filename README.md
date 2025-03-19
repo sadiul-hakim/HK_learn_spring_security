@@ -543,4 +543,367 @@ public class AuthorizationServerConfig {
 - **Spring Authorization Server vs Keycloak** → Use Spring if you need full customization; use Keycloak if you need an
   out-of-the-box identity system.
 
-Would you like a hands-on guide on implementing one of these? 🚀
+# Securing a Monolithic Spring Boot REST API using Spring OAuth2
+
+This guide explains how to secure a **single-service (monolith) Spring Boot REST API** using **Spring Security with
+OAuth2**.
+
+## **1. Dependencies**
+
+Add the following dependencies in your `pom.xml` (Maven):
+
+```xml
+
+<dependencies>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+    </dependency>
+
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+</dependencies>
+```
+
+If you're using **Spring Authorization Server** to issue tokens, add:
+
+```xml
+
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-oauth2-authorization-server</artifactId>
+</dependency>
+```
+
+---
+
+## **2. Configuration**
+
+### **2.1 Configure Authorization Server (Token Issuance using JWT)**
+
+Create `AuthorizationServerConfig.java`:
+
+```java
+
+@Configuration
+@EnableAuthorizationServer
+public class AuthorizationServerConfig {
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .oauth2ResourceServer(OAuth2ResourceServerConfigurer::jwt);
+        return http.build();
+    }
+
+    @Bean
+    public RegisteredClientRepository registeredClientRepository() {
+        RegisteredClient client = RegisteredClient.withId(UUID.randomUUID().toString())
+                .clientId("client-id")
+                .clientSecret("{noop}client-secret")
+                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                .authorizationGrantType(AuthorizationGrantType.PASSWORD)
+                .tokenSettings(TokenSettings.builder().accessTokenTimeToLive(Duration.ofHours(1)).build())
+                .build();
+        return new InMemoryRegisteredClientRepository(client);
+    }
+}
+```
+
+This configuration:
+
+- Sets up an OAuth2 Authorization Server to issue JWT tokens.
+- Registers a sample client with `client-id` and `client-secret`.
+- Supports `client_credentials` and `password` grant types.
+
+### **2.2 Configure Resource Server (API Protection using JWT)**
+
+Create `SecurityConfig.java`:
+
+```java
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/public").permitAll()  // Public endpoints
+                        .requestMatchers("/api/user").hasRole("USER")  // Restricted to USER role
+                        .requestMatchers("/api/admin").hasRole("ADMIN")  // Restricted to ADMIN role
+                        .anyRequest().authenticated()
+                )
+                .oauth2ResourceServer(OAuth2ResourceServerConfigurer::jwt);  // Enable JWT validation
+
+        return http.build();
+    }
+
+    @Bean
+    public JwtDecoder jwtDecoder() {
+        return JwtDecoders.fromIssuerLocation("http://localhost:9000"); // Use local Authorization Server
+    }
+}
+```
+
+### **2.3 Define Application Properties**
+
+Add OAuth2 configuration in `application.yml`:
+
+```yaml
+server:
+  port: 9000  # Authorization Server runs separately
+
+spring:
+  security:
+    oauth2:
+      authorization-server:
+        issuer: http://localhost:9000
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:9000  # Authorization Server URL
+```
+
+---
+
+## **3. Flow: How Authentication and Authorization Work**
+
+### **3.1 Authentication Flow**
+
+1. **User logs in** via Spring Authorization Server.
+2. The Authorization Server **issues a JWT token** to the user.
+3. The user includes the JWT token in the `Authorization` header when making requests to the API:
+   ```http
+   GET /api/user HTTP/1.1
+   Host: myapi.com
+   Authorization: Bearer eyJhbGciOiJIUzI1...
+   ```
+4. Spring Boot **validates the JWT token** using the Authorization Server (`http://localhost:9000`).
+5. If the token is valid, access is granted **based on roles and permissions**.
+
+### **3.2 Authorization Flow**
+
+- **Public Endpoints (`/api/public`)** → Accessible to everyone.
+- **Protected Endpoints (`/api/user`)** → Only accessible to users with the `ROLE_USER`.
+- **Admin Endpoints (`/api/admin`)** → Only accessible to users with the `ROLE_ADMIN`.
+
+🔹 **Spring Security checks the JWT claims** (e.g., roles, expiration, issuer) before allowing access.
+
+---
+
+## **Conclusion**
+
+- ✅ **Use Spring OAuth2 Resource Server** to validate JWT tokens.
+- ✅ **Protect endpoints with roles & permissions**.
+- ✅ **Use Spring Authorization Server** to issue JWT tokens.
+- ✅ **Use JWT tokens for stateless authentication.**
+
+`The spring-boot-starter-oauth2-client dependency is not included because this guide focuses on securing a monolithic
+ REST API that acts as an OAuth2 Resource Server and an Authorization Server.`
+
+## When to Use spring-boot-starter-oauth2-client
+
+You would add the oauth2-client dependency if your application needs to act as an OAuth2 client, meaning it would:
+
+1. Request tokens from an Authorization Server (e.g., for calling third-party APIs).
+2. Use OAuth2 login for user authentication (e.g., logging in via Google, GitHub, etc.).
+3. Support Single Sign-On (SSO).
+
+For a backend-only REST API, the OAuth2 Client is usually not needed unless your API itself needs to authenticate
+against another service.
+
+# Securing a Microservices-Based Spring Boot REST API using Spring OAuth2
+
+This guide explains how to secure a **microservices-based Spring Boot REST API** using **Spring Security with OAuth2 and
+Spring Authorization Server**.
+
+## **1. Dependencies**
+
+Each microservice will require specific dependencies.
+
+### **1.1 Authorization Server (Auth Service)**
+
+This service issues JWT tokens.
+
+```xml
+
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-security</artifactId>
+</dependency>
+
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-oauth2-authorization-server</artifactId>
+</dependency>
+
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-web</artifactId>
+</dependency>
+```
+
+### **1.2 Resource Server (Protected API Services)**
+
+Each microservice that requires authentication will act as a **Resource Server**.
+
+```xml
+
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-security</artifactId>
+</dependency>
+
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+</dependency>
+
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-web</artifactId>
+</dependency>
+```
+
+---
+
+## **2. Configuration**
+
+### **2.1 Authorization Server Configuration (Auth Service)**
+
+Create `AuthorizationServerConfig.java`:
+
+```java
+
+@Configuration
+@EnableAuthorizationServer
+public class AuthorizationServerConfig {
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .oauth2ResourceServer(OAuth2ResourceServerConfigurer::jwt);
+        return http.build();
+    }
+
+    @Bean
+    public RegisteredClientRepository registeredClientRepository() {
+        RegisteredClient client = RegisteredClient.withId(UUID.randomUUID().toString())
+                .clientId("client-id")
+                .clientSecret("{noop}client-secret")
+                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                .authorizationGrantType(AuthorizationGrantType.PASSWORD)
+                .tokenSettings(TokenSettings.builder().accessTokenTimeToLive(Duration.ofHours(1)).build())
+                .build();
+        return new InMemoryRegisteredClientRepository(client);
+    }
+}
+```
+
+### **2.2 Resource Server Configuration (Protected API Services)**
+
+Each microservice that requires authentication should have the following configuration.
+
+Create `SecurityConfig.java`:
+
+```java
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/public").permitAll()
+                        .requestMatchers("/api/user").hasRole("USER")
+                        .requestMatchers("/api/admin").hasRole("ADMIN")
+                        .anyRequest().authenticated()
+                )
+                .oauth2ResourceServer(OAuth2ResourceServerConfigurer::jwt);
+
+        return http.build();
+    }
+
+    @Bean
+    public JwtDecoder jwtDecoder() {
+        return JwtDecoders.fromIssuerLocation("http://auth-service:9000");
+    }
+}
+```
+
+### **2.3 Define Application Properties**
+
+Each microservice should be configured to use the Authorization Server.
+
+#### **Authorization Server (`auth-service`) Configuration:**
+
+```yaml
+server:
+  port: 9000
+
+spring:
+  security:
+    oauth2:
+      authorization-server:
+        issuer: http://auth-service:9000
+```
+
+#### **Resource Server (`api-service`) Configuration:**
+
+```yaml
+server:
+  port: 8081
+
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://auth-service:9000
+```
+
+---
+
+## **3. Flow: How Authentication and Authorization Work**
+
+### **3.1 Authentication Flow**
+
+1. **User logs in** by making a request to the Authorization Server (`auth-service`).
+2. The Authorization Server **issues a JWT token** to the user.
+3. The user includes the JWT token in the `Authorization` header when making requests to the microservices.
+   ```http
+   GET /api/user HTTP/1.1
+   Host: api-service
+   Authorization: Bearer eyJhbGciOiJIUzI1...
+   ```
+4. The API service **validates the JWT token** by checking with the Authorization Server (`http://auth-service:9000`).
+5. If valid, access is granted based on roles and permissions.
+
+### **3.2 Authorization Flow**
+
+- **Public Endpoints (`/api/public`)** → Accessible to everyone.
+- **Protected Endpoints (`/api/user`)** → Only accessible to users with `ROLE_USER`.
+- **Admin Endpoints (`/api/admin`)** → Only accessible to users with `ROLE_ADMIN`.
+
+🔹 **Spring Security verifies JWT claims** before granting access.
+
+---
+
+## **Conclusion**
+
+- ✅ **Use Spring Authorization Server** to issue JWT tokens.
+- ✅ **Protect each microservice as a Resource Server**.
+- ✅ **Use JWT for stateless authentication**.
+- ✅ **Microservices authenticate requests using tokens from the centralized Auth Server**.
