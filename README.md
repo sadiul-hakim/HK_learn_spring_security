@@ -907,3 +907,12 @@ spring:
 - ✅ **Protect each microservice as a Resource Server**.
 - ✅ **Use JWT for stateless authentication**.
 - ✅ **Microservices authenticate requests using tokens from the centralized Auth Server**.
+
+`OAuth2 client dependency is not used here as well`
+
+## Why It’s Not Used Here:
+
+1. The Authorization Server issues JWT tokens, and Resource Servers only validate them. They do not need to act as
+   OAuth2 clients.
+2. The microservices authenticate API requests, but they do not log in users or request tokens from other OAuth2
+   providers.
