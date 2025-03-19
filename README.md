@@ -920,3 +920,127 @@ spring:
    OAuth2 clients.
 2. The microservices authenticate API requests, but they do not log in users or request tokens from other OAuth2
    providers.
+
+# Authorization Grant Types in OAuth2
+
+OAuth2 defines several **Authorization Grant Types** that determine how a client application obtains an access token to
+access protected resources. Each grant type serves different use cases, ranging from web applications to
+machine-to-machine authentication.
+
+## 1. Authorization Code Grant
+
+### **Flow:**
+
+1. The user logs into an authorization server.
+2. The server redirects the user to a **callback URL** with an **authorization code**.
+3. The client exchanges the code for an **access token**.
+
+### **Use Case:**
+
+- Used for web applications with a **front-end** and **back-end**.
+- Provides enhanced security because the client secret is stored securely in the back-end.
+
+### **Example:**
+
+```http
+GET /authorize?response_type=code&client_id=CLIENT_ID&redirect_uri=CALLBACK_URL&scope=read_profile HTTP/1.1
+```
+
+## 2. Implicit Grant (Deprecated)
+
+### **Flow:**
+
+1. The user logs into the authorization server.
+2. The server **immediately returns an access token** in the redirect URL.
+3. No client authentication is required.
+
+### **Use Case:**
+
+- Previously used for **single-page applications (SPAs)**.
+- Now deprecated due to security risks (access token is exposed in the URL).
+
+## 3. Client Credentials Grant
+
+### **Flow:**
+
+1. The client (e.g., a backend service) authenticates directly with the authorization server using **client ID and
+   secret**.
+2. The server returns an **access token**.
+
+### **Use Case:**
+
+- Used for **machine-to-machine** (M2M) communication where no user is involved.
+
+### **Example:**
+
+```http
+POST /token HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+
+client_id=CLIENT_ID&client_secret=CLIENT_SECRET&grant_type=client_credentials
+```
+
+## 4. Resource Owner Password Credentials (ROPC) Grant
+
+### **Flow:**
+
+1. The user provides **username and password** directly to the client.
+2. The client sends these credentials to the authorization server.
+3. The server validates them and returns an **access token**.
+
+### **Use Case:**
+
+- Used when the client application is **highly trusted** (e.g., a mobile app from the same provider as the API).
+- **Not recommended** due to security concerns.
+
+### **Example:**
+
+```http
+POST /token HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+
+username=USER&password=PASS&grant_type=password&client_id=CLIENT_ID
+```
+
+## 5. Refresh Token Grant
+
+### **Flow:**
+
+1. The client exchanges a **refresh token** (previously issued) for a **new access token**.
+2. The server validates the refresh token and issues a new access token.
+
+### **Use Case:**
+
+- Allows users to stay logged in **without re-entering credentials**.
+- Used in combination with other grants.
+
+### **Example:**
+
+```http
+POST /token HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+
+refresh_token=REFRESH_TOKEN&grant_type=refresh_token&client_id=CLIENT_ID
+```
+
+---
+
+## **Comparison of OAuth2 Grant Types**
+
+| Grant Type                     | Best For                        | Security Level | Requires User Login? |
+|--------------------------------|---------------------------------|----------------|----------------------|
+| Authorization Code             | Web apps (back-end + front-end) | High           | ✅ Yes                |
+| Implicit (Deprecated)          | SPAs (front-end only)           | Low            | ✅ Yes                |
+| Client Credentials             | Machine-to-machine (M2M)        | High           | ❌ No                 |
+| Resource Owner Password (ROPC) | Legacy systems, trusted apps    | Low            | ✅ Yes                |
+| Refresh Token                  | Extending session duration      | High           | ❌ No                 |
+
+---
+
+## **Conclusion**
+
+- **Use Authorization Code** for web apps (**best practice**).
+- **Use Client Credentials** for machine-to-machine communication.
+- **Avoid Implicit Grant** (deprecated).
+- **Avoid ROPC** unless absolutely necessary.
+- **Use Refresh Tokens** to maintain sessions efficiently.
