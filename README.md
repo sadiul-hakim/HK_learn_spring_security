@@ -417,6 +417,270 @@ public PasswordEncoder passwordEncoder() {
 `We can create custom login page the login page url should be configured in .loginPage(). We can also change 
 username,password, remember_me input fields name.`
 
+# Custom Jwt Authentication
+`Custom Jwt Authentication` is the best way to handle authentication for single service backend apps. 
+This functionality is not build in the framework, it it done manualy using jwt libraries.
+
+## Dependencies
+```xml
+<dependencies>
+    <!-- Spring Boot Security -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+
+    <!-- Spring Boot Web -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
+    <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.11.5</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-impl -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.11.5</version>
+            <scope>runtime</scope>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-jackson -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>0.11.5</version>
+            <scope>runtime</scope>
+        </dependency>
+</dependencies>
+```
+
+## Jwt Helper
+```Java
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import java.security.Key;
+import java.util.Date;
+import java.util.Map;
+import java.util.function.Function;
+
+public class JwtHelper {
+    private static final String SECRET = "VxRfBGJFviiO62cg/M0YY5WypcyvtUUjfkI5aDJgwt4dLz6BQKuaKChKyn+Ulhz+";
+
+
+    public static String generateToken(UserDetails userDetails, Map<String, Object> extraClaims, long expirationDate) {
+
+        return Jwts.builder()
+                .setClaims(extraClaims)
+                .signWith(getSecretKey(), SignatureAlgorithm.HS256)
+                .setExpiration(new Date(System.currentTimeMillis() + expirationDate))
+                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setSubject(userDetails.getUsername())
+                .compact();
+    }
+
+    public static boolean isValidToken(String token, UserDetails details) throws MalformedJwtException {
+
+        boolean isValid = extractUsername(token).equalsIgnoreCase(details.getUsername()) && !isExpired(token);
+        if (!isValid) {
+            throw new MalformedJwtException("Invalid Token");
+        }
+        return true;
+    }
+
+    private static boolean isExpired(String token) {
+
+        return extractExpiration(token).before(new Date());
+    }
+
+    private static Date extractExpiration(String token) throws MalformedJwtException {
+
+        return parseSingleClaim(token, Claims::getExpiration);
+    }
+
+    public static String extractUsername(String token) throws ExpiredJwtException, UnsupportedJwtException,
+            MalformedJwtException, SignatureException, IllegalArgumentException {
+
+        return parseSingleClaim(token, Claims::getSubject);
+    }
+
+    public static Object extractClaim(String token, String claim) throws MalformedJwtException {
+
+        return parseSingleClaim(token, claims -> claims.get(claim, Object.class));
+    }
+
+    private static <T> T parseSingleClaim(String token, Function<Claims, T> resolver) throws ExpiredJwtException,
+            UnsupportedJwtException, MalformedJwtException, SignatureException, IllegalArgumentException {
+
+        Claims claims = extractAllClaims(token);
+        return resolver.apply(claims);
+    }
+
+    private static Claims extractAllClaims(String token) throws ExpiredJwtException, UnsupportedJwtException,
+            MalformedJwtException, SignatureException, IllegalArgumentException {
+
+        JwtParser parser = Jwts.parserBuilder()
+                .setSigningKey(getSecretKey()).build();
+        return parser.parseClaimsJws(token).getBody();
+    }
+
+    private static Key getSecretKey() {
+
+        byte[] bytes = Decoders.BASE64.decode(SECRET);
+        return Keys.hmacShaKeyFor(bytes);
+    }
+}
+```
+
+## Authorization Filter
+```Java
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.massmanagement.service.CustomUserDetailsService;
+import org.massmanagement.util.JwtHelper;
+import org.massmanagement.util.ResponseUtility;
+import org.springframework.http.HttpHeaders;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class CustomAuthorizationFilter extends OncePerRequestFilter {
+
+    private final CustomUserDetailsService userDetailsService;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) {
+
+        try {
+            if (request.getServletPath().equalsIgnoreCase("/login") ||
+                    request.getServletPath().endsWith("/validate-token")) {
+                filterChain.doFilter(request, response);
+            } else {
+                String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
+                if (authorization != null && authorization.startsWith("Bearer ")) {
+
+                    // Extract the token from authorization text
+                    String token = authorization.substring("Bearer ".length());
+
+                    // Extract the username
+                    String username = JwtHelper.extractUsername(token);
+
+                    // Get the userDetails using username
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+                    // If the token is valid and user is not authenticated, authenticate the user
+                    if (JwtHelper.isValidToken(token, userDetails) && SecurityContextHolder.getContext().getAuthentication() == null) {
+                        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities() // We need to pass the Granted Authority list, otherwise user would be forbidden.
+                        );
+                        SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+                    }
+
+                }
+
+                // If the authorization does not exist, or it does not start with Bearer, simply let the program go.
+                filterChain.doFilter(request, response);
+            }
+        } catch (Exception ex) {
+            log.error("Error Occurred in CustomAuthorizationFilter. Cause : {}", ex.getMessage());
+
+            // If the token is Invalid send an error with the response
+            Map<String, String> errorMap = new HashMap<>();
+            errorMap.put("error", ex.getMessage());
+            ResponseUtility.commitResponse(response, errorMap, 500);
+        }
+    }
+}
+```
+
+## Security Config
+```Java
+import lombok.RequiredArgsConstructor;
+import org.massmanagement.security.CustomAuthenticationFilter;
+import org.massmanagement.security.CustomAuthorizationFilter;
+import org.massmanagement.service.CustomUserDetailsService;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+
+import java.util.List;
+
+@Configuration
+@EnableCaching
+@RequiredArgsConstructor
+@EnableWebSecurity
+class SecurityConfig {
+    private final CustomUserDetailsService userDetailsService;
+    private final CustomAuthorizationFilter customAuthorizationFilter;
+    @Value("${frontend.uri}")
+    private String frontendUri;
+
+    @Bean
+    public SecurityFilterChain config(HttpSecurity http) throws Exception {
+
+
+        return http.csrf(AbstractHttpConfigurer::disable)
+                .cors(c -> {
+                    CorsConfigurationSource source = e -> {
+                        CorsConfiguration config = new CorsConfiguration();
+                        config.setAllowedOrigins(List.of(frontendUri));
+                        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE"));
+                        config.setAllowedHeaders(List.of("*"));
+
+                        return config;
+                    };
+
+                    c.configurationSource(source);
+                })
+                .authorizeHttpRequests(auth -> auth.requestMatchers("/security/v1/validate-token").permitAll())
+                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .userDetailsService(userDetailsService)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .addFilterBefore(customAuthorizationFilter, UsernamePasswordAuthenticationFilter.class)
+                .build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+}
+```
+
 # OAuth2 in Spring Boot: Explained Simply
 
 OAuth2 is a security framework used for authentication and authorization in modern applications. Spring Boot provides
