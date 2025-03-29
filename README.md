@@ -305,8 +305,6 @@ public class CustomCsrfTokenRepository implements CsrfTokenRepository {
 | AJAX Requests (SPAs)            | ✅ Yes            | Uses cookies for authentication      |
 | Public APIs (No Authentication) | ❌ No             | No sensitive state changes           |
 
----
-
 ### 5️⃣ Conclusion
 
 - **CSRF is enabled by default** in Spring Security.
@@ -314,9 +312,9 @@ public class CustomCsrfTokenRepository implements CsrfTokenRepository {
 - **Use `CookieCsrfTokenRepository` for AJAX-based apps**.
 - **Customize CSRF handling using `CsrfTokenRepository`** for advanced use cases.
 
-Let me know if you need help integrating this into your **SpringBase** project! 🚀
+---
 
-## Social Login (OAuth2) - Google
+## 1. Social Login (OAuth2) - Google
 
 1. Create google app from https://console.cloud.google.com/ use redirect url like this
    `http://localhost:9090/login/oauth2/code/google`
@@ -341,7 +339,7 @@ public SecurityFilterChain config(HttpSecurity http) throws Exception {
 
 `Oauth2 authenticated users Principal type is OAuth2User`
 
-## Basic Auth
+## 2. Basic Auth
 
 We have en endpoint /who_is_he?shortName=?. To secure this app with basic auth follow the next instruction
 
@@ -388,7 +386,7 @@ public PasswordEncoder passwordEncoder() {
 
 `You can provide lamda (http) -> {} and provide some custome configuration`.
 
-## Form Login
+## 3. Form Login
 
 `Exactly like Basic Auth with slidly different config like below: `
 
@@ -417,11 +415,11 @@ public PasswordEncoder passwordEncoder() {
 `We can create custom login page the login page url should be configured in .loginPage(). We can also change 
 username,password, remember_me input fields name.`
 
-# Custom Jwt Authentication
+## 4. Custom Jwt Authentication
 `Custom Jwt Authentication` is the best way to handle authentication for single service backend apps. 
 This functionality is not build in the framework, it it done manualy using jwt libraries.
 
-## Dependencies
+### Dependencies
 ```xml
 <dependencies>
     <!-- Spring Boot Security -->
@@ -458,7 +456,7 @@ This functionality is not build in the framework, it it done manualy using jwt l
 </dependencies>
 ```
 
-## Jwt Helper
+### Jwt Helper
 ```Java
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
@@ -539,7 +537,7 @@ public class JwtHelper {
 }
 ```
 
-## Authorization Filter
+### Authorization Filter
 ```Java
 
 import jakarta.servlet.FilterChain;
@@ -614,7 +612,7 @@ public class CustomAuthorizationFilter extends OncePerRequestFilter {
 }
 ```
 
-## Security Config
+### Security Config
 ```Java
 import lombok.RequiredArgsConstructor;
 import org.massmanagement.security.CustomAuthenticationFilter;
@@ -680,7 +678,7 @@ class SecurityConfig {
     }
 }
 ```
-
+---
 # OAuth2 in Spring Boot: Explained Simply
 
 OAuth2 is a security framework used for authentication and authorization in modern applications. Spring Boot provides
