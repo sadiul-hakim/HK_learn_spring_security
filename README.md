@@ -256,6 +256,7 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
     http
             .csrf(csrf -> csrf
                     .csrfTokenRepository(new CustomCsrfTokenRepository()) // Use custom CSRF repository
+                     .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
             )
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/admin/**").authenticated()
