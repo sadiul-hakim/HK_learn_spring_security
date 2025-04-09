@@ -1,4 +1,329 @@
-# `SecureSpringApp`
+# Download the zip file and create next solution.
+
+# Documentation
+
+```
+    Client
+      ⬇️
+   | Authentication Filter | ➡️ | Security Context |
+       ⬇️
+   | Authentication Manager |  
+       ⬇️                             | User Details Service |
+   | Authentication Provider |  ➡️ -----------------------------
+                                       | Password Encoder |
+```
+
+> Adding Filter before .addFilterBefore() of HttpSecurity
+
+```
+| Cors Filter | ➡️ | Csrf Filter | ➡️ | Custom Filter | ➡️ | BasicAuthenticationFilter |
+```
+
+> Adding Filter after .addFilterAfter() of HttpSecurity
+
+```
+| Cors Filter | ➡️ | Csrf Filter | ➡️ | BasicAuthenticationFilter | ➡️ | Custom Filter |
+```
+
+> Adding filter at the position of another filter .addFilterAt() of HttpSecurity
+
+# Spring Security Reference Guide
+
+## 1. Spring Security Overview
+
+Spring Security is a powerful authentication and access-control framework for Java applications that provides:
+
+- Comprehensive security services for J2EE applications
+- Both authentication and authorization capabilities
+- Protection against common exploits (CSRF, session fixation)
+- Integration with various authentication protocols
+
+## 2. User Management (UserDetails)
+
+### Core Components:
+
+- **UserDetails Interface**: Core user information contract
+- **Custom Implementations**: Wrap domain user objects
+- **In-Memory Users**: Quick setup for testing
+
+## 3. GrantedAuthority
+
+Represents permissions/roles granted to users:
+
+- Typically implemented as `SimpleGrantedAuthority`
+- String-based representation (e.g., "ROLE_ADMIN")
+- Retrieved via `UserDetails.getAuthorities()`
+
+## 4. UserDetailsService
+
+Central interface for loading user-specific data:
+
+### Implementation Options:
+
+1. **In-Memory**
+    - `InMemoryUserDetailsManager`
+    - Good for testing/prototyping
+
+2. **Custom**
+    - Database-backed implementations
+    - Typically uses JPA/Hibernate
+
+3. **LDAP**
+    - Enterprise directory integration
+
+## 5. UserDetailsManager
+
+Extends `UserDetailsService` with user management capabilities:
+
+**Key Methods**:
+
+- `createUser()`
+- `updateUser()`
+- `deleteUser()`
+- `changePassword()`
+
+## 6. Password Encoding
+
+Critical security component with multiple algorithm options:
+
+**Supported Algorithms**:
+
+1. BCrypt (recommended)
+2. Argon2
+3. SCrypt
+4. PBKDF2
+
+**Configuration**:
+
+```java
+
+@Bean
+PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+}
+```
+
+## 7. Spring Crypto Module
+
+Provides cryptographic utilities for:
+
+- Symmetric encryption
+- Key generation
+- Secure random number generation
+
+### Key Components:
+
+**1. Encryptors**:
+
+- `BytesEncryptor`: For byte array encryption
+- `TextEncryptor`: For text encryption
+- Factory methods in `Encryptors` class
+
+**2. Key Generators**:
+
+- `StringKeyGenerator`: For string keys
+- `BytesKeyGenerator`: For byte array keys
+- Configurable key length
+
+**3. Password Encoding**:
+
+- Separate from Spring Security's password encoding
+- Provides low-level crypto primitives
+
+**Common Use Cases**:
+
+- Encrypting sensitive configuration properties
+- Secure data storage
+- Cryptographic operations in business logic
+
+## 8. CORS (Cross-Origin Resource Sharing)
+
+### Configuration Options:
+
+```java
+
+@Bean
+CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration config = new CorsConfiguration();
+    config.setAllowedOrigins(Arrays.asList("https://trusted.com"));
+    config.setAllowedMethods(Arrays.asList("GET", "POST"));
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", config);
+    return source;
+}
+```
+
+### Key Settings:
+
+- allowedOrigins: Whitelisted domains
+- allowedMethods: HTTP methods (GET, POST etc.)
+- allowedHeaders: Request headers
+- exposedHeaders: Response headers
+- allowCredentials: Cookie/credential support
+- maxAge: Preflight cache duration
+
+## 9. CSRF Protection
+
+Cross-Site Request Forgery (CSRF) protection prevents unauthorized commands from being executed on behalf of
+authenticated users. Spring Security provides:
+
+- Automatic token generation and validation
+- Protection for state-changing requests (POST, PUT, DELETE)
+- Configurable token storage (session or cookies)
+
+Configuration options include:
+
+- Custom token repositories
+- Exclusion patterns for public endpoints
+- Header name customization
+
+## 10. Custom Filters
+
+Custom filters can be added to the security filter chain to:
+
+- Process requests before authentication
+- Modify responses after security processing
+- Add custom security headers
+
+Implementation requires:
+
+1. Creating a class implementing `javax.servlet.Filter`
+2. Registering it in the security configuration using:
+    - `addFilterBefore()`
+    - `addFilterAfter()`
+    - `addFilterAt()`
+
+## 11. Authentication Provider
+
+The `AuthenticationProvider` interface handles the core authentication logic. Key aspects:
+
+- Receives an `Authentication` object containing credentials
+- Returns a fully populated `Authentication` object on success
+- Throws `AuthenticationException` on failure
+
+Common implementations include:
+
+- `DaoAuthenticationProvider` for database authentication
+- `LdapAuthenticationProvider` for LDAP authentication
+- Custom providers for specialized authentication logic
+
+## 12. SecurityContext
+
+The SecurityContext holds the current authentication state:
+
+- Stored in a thread-local variable by default
+- Accessed via `SecurityContextHolder`
+- Contains the authenticated principal and granted authorities
+
+Delegating classes (`DelegatingSecurityContextRunnable`, `DelegatingSecurityContextCallable`) propagate the security
+context to new threads.
+
+## 13. Form Login
+
+Form-based authentication provides:
+
+- Default login page at `/login`
+- Configurable authentication processing URL
+- Success and failure handling
+- Remember-me functionality
+
+Customization options include:
+
+- Custom login page URL
+- Parameter name customization
+- Success/failure handlers
+- Persistent login (remember-me)
+
+## 14. Authorization
+
+Authorization controls access to resources at different levels:
+
+**Endpoint Level:**
+
+```java
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+
+void config(HttpSecurity http) {
+    http.authorizeHttpRequests(auth -> auth.requestMatchers("/admin/**").hasRole("ADMIN")
+            .anyRequest().authenticated());
+}
+```
+
+### Method Level:
+
+- @PreAuthorize for pre-execution checks
+- @PostAuthorize for post-execution checks
+- @Secured for simple role-based checks
+- @RolesAllowed (JSR-250) for standard role checks
+
+## 15. Method Level Filtering
+
+Spring Security provides annotation-based filtering for collection parameters and return values at the method level.
+
+### @PreFilter Annotation
+
+**Purpose**:  
+Filters collection-type method arguments **before** method execution
+
+**Key Features**:
+
+- Operates on `Collection`, `Array`, `Map` or `Stream` inputs
+- Uses SpEL expressions with `filterObject` representing each element
+- Removes elements that don't pass the security expression
+
+**Example**:
+
+```java
+
+@PreFilter("filterObject.owner == authentication.name")
+public void updateAccounts(List<Account> accounts) {
+    // Method implementation
+}
+```
+
+#### Common Use Cases:
+
+- Filtering user-submitted lists
+- Ensuring users only modify their own entities
+- Pre-processing collections based on permissions
+
+### @PostFilter Annotation
+
+#### Purpose:
+
+Filters collection-type return values after method execution
+
+#### Key Features:
+
+- Applies to methods returning Collection, Array, Map or Stream
+- Uses SpEL expressions with filterObject
+- Automatically removes unauthorized elements
+
+```java
+
+@PostFilter("hasPermission(filterObject, 'READ')")
+public List<Document> getAllDocuments() {
+    // Method implementation
+}
+```
+
+#### Common Use Cases:
+
+- Securing repository findAll() methods
+- Filtering report data by access rights
+- Implementing row-level security
+
+### Performance Considerations
+
+| Approach             | Pros                                    | Cons                                   |
+|----------------------|-----------------------------------------|----------------------------------------|
+| **@PreFilter**       | Early filtering reduces processing load | Still loads all data from source       |
+| **@PostFilter**      | Simple to implement                     | Memory-intensive for large collections |
+| **Repository-Level** | Most efficient                          | Requires custom query logic            |
+
+---
+
+# `SecureSpringApp : Example starts from here`
 
 We have very secret information in index.html file. We want to hide it. In a monolith backend app we can secure
 our application in many ways. Like:
@@ -256,7 +581,7 @@ public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Excepti
     http
             .csrf(csrf -> csrf
                     .csrfTokenRepository(new CustomCsrfTokenRepository()) // Use custom CSRF repository
-                     .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
+                    .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
             )
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/admin/**").authenticated()
@@ -417,11 +742,14 @@ public PasswordEncoder passwordEncoder() {
 username,password, remember_me input fields name.`
 
 ## 4. Custom Jwt Authentication
-`Custom Jwt Authentication` is the best way to handle authentication for single service backend apps. 
+
+`Custom Jwt Authentication` is the best way to handle authentication for single service backend apps.
 This functionality is not build in the framework, it it done manualy using jwt libraries.
 
 ### Dependencies
+
 ```xml
+
 <dependencies>
     <!-- Spring Boot Security -->
     <dependency>
@@ -436,28 +764,29 @@ This functionality is not build in the framework, it it done manualy using jwt l
     </dependency>
 
     <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-api</artifactId>
-            <version>0.11.5</version>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-impl -->
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-impl</artifactId>
-            <version>0.11.5</version>
-            <scope>runtime</scope>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-jackson -->
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-jackson</artifactId>
-            <version>0.11.5</version>
-            <scope>runtime</scope>
-        </dependency>
+        <groupId>io.jsonwebtoken</groupId>
+        <artifactId>jjwt-api</artifactId>
+        <version>0.11.5</version>
+    </dependency>
+    <!-- https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-impl -->
+    <dependency>
+        <groupId>io.jsonwebtoken</groupId>
+        <artifactId>jjwt-impl</artifactId>
+        <version>0.11.5</version>
+        <scope>runtime</scope>
+    </dependency>
+    <!-- https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-jackson -->
+    <dependency>
+        <groupId>io.jsonwebtoken</groupId>
+        <artifactId>jjwt-jackson</artifactId>
+        <version>0.11.5</version>
+        <scope>runtime</scope>
+    </dependency>
 </dependencies>
 ```
 
 ### Jwt Helper
+
 ```Java
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
@@ -539,6 +868,7 @@ public class JwtHelper {
 ```
 
 ### Authentication Filter
+
 This includes login functionality
 
 ```Java
@@ -593,7 +923,7 @@ public class CustomAuthenticationFilter extends UsernamePasswordAuthenticationFi
         extraClaims.put("roles", user.getAuthorities());
 
         String accessToken = JwtHelper.generateToken(user, extraClaims, (1000L * 60 * 60 * 24 * 7)); // expires in 7 days
-        String refreshToken = JwtHelper.generateToken(user, extraClaims ,(1000L * 60 * 60 * 24 * 30)); // expires in 30 days
+        String refreshToken = JwtHelper.generateToken(user, extraClaims, (1000L * 60 * 60 * 24 * 30)); // expires in 30 days
 
         Map<String, String> tokenMap = new HashMap<>();
         tokenMap.put("accessToken", accessToken);
@@ -606,6 +936,7 @@ public class CustomAuthenticationFilter extends UsernamePasswordAuthenticationFi
 ```
 
 ### Authorization Filter
+
 ```Java
 
 import jakarta.servlet.FilterChain;
@@ -681,6 +1012,7 @@ public class CustomAuthorizationFilter extends OncePerRequestFilter {
 ```
 
 ### Security Config
+
 ```Java
 import lombok.RequiredArgsConstructor;
 import org.massmanagement.security.CustomAuthenticationFilter;
@@ -750,7 +1082,7 @@ class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-   @Bean
+    @Bean
     UserDetailsService userDetailsService() {
         UserDetails admin = User.withUsername("admin")
                 .password(passwordEncoder().encode("admin"))
@@ -775,8 +1107,10 @@ class SecurityConfig {
     }
 }
 ```
+
 ---
-# OAuth2 in Spring Boot: Explained Simply
+
+# OAuth2 in Spring Boot: Explained Simply ❌
 
 OAuth2 is a security framework used for authentication and authorization in modern applications. Spring Boot provides
 different components to implement OAuth2:
@@ -902,7 +1236,7 @@ public class AuthorizationServerConfig {
 - **Spring Authorization Server vs Keycloak** → Use Spring if you need full customization; use Keycloak if you need an
   out-of-the-box identity system.
 
-# Securing a Monolithic Spring Boot REST API using Spring OAuth2
+# Securing a Monolithic Spring Boot REST API using Spring OAuth2 ❌
 
 This guide explains how to secure a **single-service (monolith) Spring Boot REST API** using **Spring Security with
 OAuth2**.
@@ -1080,7 +1414,7 @@ You would add the oauth2-client dependency if your application needs to act as a
 For a backend-only REST API, the OAuth2 Client is usually not needed unless your API itself needs to authenticate
 against another service.
 
-# Securing a Microservices-Based Spring Boot REST API using Spring OAuth2
+# Securing a Microservices-Based Spring Boot REST API using Spring OAuth2 ❌
 
 This guide explains how to secure a **microservices-based Spring Boot REST API** using **Spring Security with OAuth2 and
 Spring Authorization Server**.
@@ -1280,7 +1614,7 @@ spring:
 2. The microservices authenticate API requests, but they do not log in users or request tokens from other OAuth2
    providers.
 
-# Authorization Grant Types in OAuth2
+# Authorization Grant Types in OAuth2 ❌
 
 OAuth2 defines several **Authorization Grant Types** that determine how a client application obtains an access token to
 access protected resources. Each grant type serves different use cases, ranging from web applications to
